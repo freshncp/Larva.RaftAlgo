@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>Jerry Bai</Authors>
+    <PackageProjectUrl>https://github.com/freshncp/Larva.RaftAlgo</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/freshncp/Larva.RaftAlgo.git</RepositoryUrl>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>Larva.RaftAlgo</PackageId>
+    <Title>Larva.RaftAlgo</Title>
+    <Version>0.1.0</Version>
+    <PackageTags>raft consensus algorithm</PackageTags>
+    <Description></Description>
+    <!-- <PackageIcon>_content\package.png</PackageIcon>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <ContentTargetFolders>_content</ContentTargetFolders> -->
+    <PackageReleaseNotes>https://github.com/freshncp/Larva.RaftAlgo
+    </PackageReleaseNotes>
+  </PropertyGroup>
+
+</Project>
