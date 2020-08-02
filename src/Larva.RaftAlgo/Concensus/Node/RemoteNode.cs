@@ -1,5 +1,7 @@
 using System;
+using System.Threading.Tasks;
 using Larva.RaftAlgo.Concensus.Rpc;
+using Larva.RaftAlgo.Concensus.Rpc.Messages;
 
 namespace Larva.RaftAlgo.Concensus.Node
 {
@@ -8,6 +10,8 @@ namespace Larva.RaftAlgo.Concensus.Node
     /// </summary>
     public sealed class RemoteNode : INode
     {
+        private readonly IRpcClient _rpcClient;
+
         /// <summary>
         /// Remote node
         /// </summary>
@@ -18,7 +22,7 @@ namespace Larva.RaftAlgo.Concensus.Node
         {
             Id = id;
             ServiceUri = serviceUri;
-            RpcClient = rpcClient;
+            _rpcClient = rpcClient;
         }
 
         /// <summary>
@@ -32,8 +36,101 @@ namespace Larva.RaftAlgo.Concensus.Node
         public Uri ServiceUri { get; private set; }
 
         /// <summary>
-        /// Rpc client
+        /// Node's state
         /// </summary>
-        public IRpcClient RpcClient { get; private set; }
+        public NodeState State
+        {
+            get
+            {
+                var result = _rpcClient.QueryNodeInfoAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                return result?.Node?.State;
+            }
+        }
+
+        /// <summary>
+        /// Node's role
+        /// </summary>
+        public NodeRole Role
+        {
+            get
+            {
+                var result = _rpcClient.QueryNodeInfoAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                return result?.Node?.Role ?? NodeRole.Follower;
+            }
+        }
+
+        /// <summary>
+        /// Join specific node to remote node.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="serviceUri"></param>
+        /// <returns></returns>
+        public async Task JoinAsync(string id, Uri serviceUri)
+        {
+            await _rpcClient.AddNodeToClusterAsync(new Rpc.Messages.AddNodeToClusterRequest(id, serviceUri));
+        }
+
+        #region RPC Request
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        public async Task<RequestVoteResponse> RequestVoteAsync(RequestVoteRequest request)
+        {
+            return await _rpcClient.RequestVoteAsync(request);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        public async Task<AppendEntriesResponse> AppendEntriesAsync(AppendEntriesRequest request)
+        {
+            return await _rpcClient.AppendEntriesAsync(request);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="command"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public async Task<ExecuteCommandResponse> ExecuteCommandAsync<T>(T command)
+        {
+            return await _rpcClient.ExecuteCommandAsync(command);
+        }
+
+        /// <summary>
+        /// Query node info
+        /// </summary>
+        /// <returns></returns>
+        public async Task<QueryNodeInfoResponse> QueryNodeInfoAsync()
+        {
+            return await _rpcClient.QueryNodeInfoAsync();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns></returns>
+        public async Task<QueryClusterInfoResponse> QueryClusterInfoAsync()
+        {
+            return await _rpcClient.QueryClusterInfoAsync();
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        public async Task<AddNodeToClusterResponse> AddNodeToClusterAsync(AddNodeToClusterRequest request)
+        {
+            return await _rpcClient.AddNodeToClusterAsync(request);
+        }
+
+        #endregion
     }
 }

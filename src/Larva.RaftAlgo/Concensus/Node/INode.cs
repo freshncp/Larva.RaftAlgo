@@ -1,11 +1,12 @@
 using System;
+using Larva.RaftAlgo.Concensus.Rpc;
 
 namespace Larva.RaftAlgo.Concensus.Node
 {
     /// <summary>
-    /// Node
+    /// Raft Node
     /// </summary>
-    public interface INode
+    public interface INode: IRpcClient
     {
         /// <summary>
         /// Node's id
@@ -16,5 +17,15 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// Service Uri
         /// </summary>
         Uri ServiceUri { get; }
+
+        /// <summary>
+        /// Node's state
+        /// </summary>
+        NodeState State { get; }
+
+        /// <summary>
+        /// Node's role
+        /// </summary>
+        NodeRole Role { get; }
     }
 }

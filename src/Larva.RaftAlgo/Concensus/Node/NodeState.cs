@@ -1,12 +1,14 @@
+using System.Collections.Generic;
+
 namespace Larva.RaftAlgo.Concensus.Node
 {
     /// <summary>
-    /// 
+    /// Node state
     /// </summary>
     public class NodeState
     {
         /// <summary>
-        /// 
+        /// Node state
         /// </summary>
         /// <param name="currentTerm"></param>
         /// <param name="votedFor"></param>
@@ -34,10 +36,93 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// index of highest log entry known to be committed (initialized to 0, increases monotonically)
         /// </summary>
         public long CommitIndex { get; private set; }
-        
+
         /// <summary>
         /// index of highest log entry applied to state machine (initialized to 0, increases monotonically)
         /// </summary>
         public long LastApplied { get; private set; }
+
+        /// <summary>
+        /// Increase term and vote for specific node id.
+        /// </summary>
+        /// <param name="nodeId"></param>
+        public void IncreaseTermAndVoteFor(string nodeId)
+        {
+            ++CurrentTerm;
+            VotedFor = nodeId;
+        }
+
+        /// <summary>
+        /// Reset votedfor to null.
+        /// </summary>
+        public void ResetVotedFor()
+        {
+            VotedFor = null;
+        }
+
+        /// <summary>
+        /// Set term to greater one
+        /// </summary>
+        /// <param name="newTerm"></param>
+        public void SetTerm(long newTerm)
+        {
+            if (CurrentTerm < newTerm)
+            {
+                CurrentTerm = newTerm;
+            }
+        }
+
+        /// <summary>
+        /// Vote for specific node id.
+        /// </summary>
+        /// <param name="nodeId"></param>
+        public void VoteFor(string nodeId)
+        {
+            if (string.IsNullOrEmpty(VotedFor))
+            {
+                VotedFor = nodeId;
+            }
+        }
+
+        /// <summary>
+        /// Set commit index to specific one.
+        /// </summary>
+        /// <param name="newCommitIndex"></param>
+        public void SetCommitIndex(long newCommitIndex)
+        {
+            CommitIndex = newCommitIndex;
+        }
+    }
+
+
+    /// <summary>
+    /// Leader node state
+    /// </summary>
+    public sealed class LeaderState : NodeState
+    {
+        /// <summary>
+        /// Leader node state
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="nextIndex"></param>
+        /// <param name="matchIndex"></param>
+        public LeaderState(NodeState state,
+            IDictionary<string, long> nextIndex, IDictionary<string, long> matchIndex)
+            : base(state.CurrentTerm, state.VotedFor, state.CommitIndex, state.LastApplied)
+        {
+            NextIndex = nextIndex;
+            MatchIndex = matchIndex;
+        }
+
+        /// <summary>
+        /// for each server, index of the next log entry to send to that server (initialized to leader
+        /// last log index + 1)
+        /// </summary>
+        public IDictionary<string, long> NextIndex { get; private set; }
+
+        /// <summary>
+        /// for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
+        /// </summary>
+        public IDictionary<string, long> MatchIndex { get; private set; }
     }
 }

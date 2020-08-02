@@ -25,7 +25,7 @@ namespace Larva.RaftAlgo.Concensus.Rpc.Messages
             LeaderId = leaderId;
             PrevLogIndex = prevLogIndex;
             PrevLogTerm = prevLogTerm;
-            Entries = entries ?? new LogEntry[] { };
+            Entries = entries;
             LeaderCommit = leaderCommit;
         }
 
