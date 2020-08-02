@@ -4,7 +4,9 @@ using BusinessCodeGenerator.Configuration;
 using BusinessCodeGenerator.Raft;
 using Larva.RaftAlgo;
 using Larva.RaftAlgo.Concensus;
+using Larva.RaftAlgo.Concensus.Cluster;
 using Larva.RaftAlgo.Concensus.Node;
+using Larva.RaftAlgo.Concensus.Rpc;
 using Larva.RaftAlgo.Log;
 using Larva.RaftAlgo.StateMachine;
 using Microsoft.AspNetCore.Builder;
@@ -20,9 +22,11 @@ namespace BusinessCodeGenerator
         {
             var configuration = (ConfigurationRoot)services.BuildServiceProvider()
                 .GetRequiredService<IConfiguration>();
-            services.AddSingleton<IElectionTimeoutRandom, InMemoryElectionTimeoutRandom>();
+            services.AddSingleton<IElectionTimeoutRandom, DefaultElectionTimeoutRandom>();
             services.AddSingleton<ILog, SqlLiteLog>();
+            services.AddSingleton<IRpcClientProvider, HttpRpcClientProvider>();
             services.AddSingleton<INode, LocalNode>();
+            services.AddSingleton<ICluster, DefaultCluster>();
             services.AddSingleton<IReplicatedStateMachine, BusinessCodeFiniteStateMachine>();
             services.AddSingleton<IBusinessCodeConfigManager, InMemoryBusinessCodeConfigManager>();
             services.AddSingleton<IBusinessCodeCache, BusinessCodeCache>();
@@ -35,7 +39,8 @@ namespace BusinessCodeGenerator
             var applicationLifetime = app.ApplicationServices.GetService<IHostApplicationLifetime>();
             applicationLifetime.ApplicationStopping.Register(async () => await OnShutdown(app));
             var node = app.ApplicationServices.GetService<INode>() as LocalNode;
-            var cluster = new InMemoryCluster(node);
+            var cluster = app.ApplicationServices.GetService<ICluster>();
+            cluster.Load();
             node.StartUpAsync(cluster).Wait();
 
             app.UseRouting();

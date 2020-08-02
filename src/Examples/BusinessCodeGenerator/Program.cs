@@ -10,6 +10,7 @@ using System.IO;
 using System.Collections.Generic;
 using Larva.RaftAlgo.Concensus.Node;
 using Larva.RaftAlgo;
+using Larva.RaftAlgo.Concensus.Cluster;
 
 namespace BusinessCodeGenerator
 {
@@ -70,8 +71,12 @@ Option:
                     x.AddSingleton<NodeId>(new NodeId(nodeId, new Uri(nodeUrl)));
                     x.AddSingleton<IRaftSettings>(new InMemoryRaftSettings
                     {
-                        MinElectionTimeoutMilliseconds = 5000,
-                        MaxElectionTimeoutMilliseconds = 10000
+                        MinElectionTimeoutMilliseconds = 3000,
+                        MaxElectionTimeoutMilliseconds = 6000
+                    });
+                    x.AddSingleton<IClusterSettings>(new InMemoryClusterSettings
+                    {
+                        RemoteNodes = null
                     });
 
                     x.AddRouting();

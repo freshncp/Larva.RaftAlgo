@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Larva.RaftAlgo.Concensus.Cluster;
 using Larva.RaftAlgo.Concensus.Rpc;
 using Larva.RaftAlgo.Concensus.Rpc.Messages;
 using Larva.RaftAlgo.Log;
@@ -74,6 +75,11 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// Node's role
         /// </summary>
         public NodeRole Role { get; private set; }
+
+        /// <summary>
+        /// Is remote node
+        /// </summary>
+        public bool IsRemote => false;
 
         /// <summary>
         /// Start up
@@ -292,7 +298,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                     {
                         response = new ExecuteCommandResponse(null, false, "No leader found");
                     }
-                    var leaderNode = _cluster.OtherNodes?.FirstOrDefault(f => f.Id == _leaderId);
+                    var leaderNode = _cluster.Nodes?.FirstOrDefault(f => f.Id == _leaderId);
                     if (leaderNode == null)
                     {
                         response = new ExecuteCommandResponse(null, false, $"Leader {_leaderId} not found in cluster");
@@ -393,7 +399,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                 var currentTerm = State.CurrentTerm;
                 var lastTermAndIndex = await _log.GetLastTermAndIndexAsync();
                 var requestVoteTaskList = new List<Task<RequestVoteResponse>>();
-                foreach (var remoteNode in _cluster.OtherNodes)
+                foreach (var remoteNode in _cluster.Nodes.Where(w => w.IsRemote))
                 {
                     requestVoteTaskList.Add(remoteNode.RequestVoteAsync(new RequestVoteRequest(currentTerm, Id, lastTermAndIndex.index, lastTermAndIndex.term)));
                 }
@@ -470,7 +476,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                         var currentState = State as LeaderState;
                         var lastTermAndIndex = await _log.GetLastTermAndIndexAsync();
                         var sendHeartbeatTasks = new List<Tuple<string, int, Task<AppendEntriesResponse>>>();
-                        foreach (var remoteNode in _cluster.OtherNodes)
+                        foreach (var remoteNode in _cluster.Nodes.Where(w => w.IsRemote))
                         {
                             if (!currentState.NextIndex.ContainsKey(remoteNode.Id))
                             {

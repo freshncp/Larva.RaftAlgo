@@ -6,7 +6,7 @@ namespace Larva.RaftAlgo.Concensus.Node
     /// <summary>
     /// Raft Node
     /// </summary>
-    public interface INode: IRpcClient
+    public interface INode : IRpcClient
     {
         /// <summary>
         /// Node's id
@@ -27,5 +27,10 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// Node's role
         /// </summary>
         NodeRole Role { get; }
+
+        /// <summary>
+        /// Is remote node
+        /// </summary>
+        bool IsRemote { get; }
     }
 }

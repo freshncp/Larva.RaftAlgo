@@ -1,6 +1,6 @@
 using Larva.RaftAlgo.Concensus.Node;
 
-namespace Larva.RaftAlgo.Concensus
+namespace Larva.RaftAlgo.Concensus.Cluster
 {
     /// <summary>
     /// Raft cluster
@@ -8,14 +8,14 @@ namespace Larva.RaftAlgo.Concensus
     public interface ICluster
     {
         /// <summary>
-        /// Current node
+        /// Nodes
         /// </summary>
-        LocalNode CurrentNode { get; }
+        INode[] Nodes { get; }
 
         /// <summary>
-        /// Other nodes
+        /// Load cluster info
         /// </summary>
-        RemoteNode[] OtherNodes { get; }
+        void Load();
 
         /// <summary>
         /// Is single node cluster

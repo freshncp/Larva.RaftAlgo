@@ -5,7 +5,7 @@ namespace Larva.RaftAlgo.Concensus
     /// <summary>
     /// Election timeout random
     /// </summary>
-    public class InMemoryElectionTimeoutRandom : IElectionTimeoutRandom
+    public sealed class DefaultElectionTimeoutRandom : IElectionTimeoutRandom
     {
         private readonly int _minElectionTimeoutMilliseconds;
         private readonly int _maxElectionTimeoutMilliseconds;
@@ -15,7 +15,7 @@ namespace Larva.RaftAlgo.Concensus
         /// 
         /// </summary>
         /// <param name="settings"></param>
-        public InMemoryElectionTimeoutRandom(IRaftSettings settings)
+        public DefaultElectionTimeoutRandom(IRaftSettings settings)
         {
             _minElectionTimeoutMilliseconds = settings.MinElectionTimeoutMilliseconds < 1000 ? 1000 : settings.MinElectionTimeoutMilliseconds;
             _maxElectionTimeoutMilliseconds = Math.Max(_minElectionTimeoutMilliseconds + 1000, settings.MaxElectionTimeoutMilliseconds < 2000 ? 2000 : settings.MaxElectionTimeoutMilliseconds);

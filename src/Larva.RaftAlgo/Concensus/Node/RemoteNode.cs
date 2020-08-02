@@ -60,6 +60,11 @@ namespace Larva.RaftAlgo.Concensus.Node
         }
 
         /// <summary>
+        /// Is remote node
+        /// </summary>
+        public bool IsRemote => true;
+
+        /// <summary>
         /// Join specific node to remote node.
         /// </summary>
         /// <param name="id"></param>
