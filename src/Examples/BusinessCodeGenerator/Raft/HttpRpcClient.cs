@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Threading.Tasks;
 using Larva.RaftAlgo.Concensus.Rpc;
 using Larva.RaftAlgo.Concensus.Rpc.Messages;
@@ -5,10 +6,21 @@ using Larva.RaftAlgo.Concensus.Rpc.Messages;
 namespace BusinessCodeGenerator.Raft
 {
     /// <summary>
-    /// In memoery Rpc client
+    /// Http rpc client
     /// </summary>
     public class HttpRpcClient : IRpcClient
     {
+        private readonly HttpClient _httpClient;
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="httpClient"></param>
+        public HttpRpcClient(HttpClient httpClient)
+        {
+            _httpClient = httpClient;
+        }
+
         /// <summary>
         /// 
         /// </summary>
