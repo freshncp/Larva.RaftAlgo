@@ -8,8 +8,8 @@ namespace Larva.RaftAlgo.Concensus.Cluster
     public class InMemoryClusterSettings : IClusterSettings
     {
         /// <summary>
-        /// Remote nodes
+        /// Nodes
         /// </summary>
-        public NodeId[] RemoteNodes { get; set; }
+        public NodeId[] Nodes { get; set; }
     }
 }

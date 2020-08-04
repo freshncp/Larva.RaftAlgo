@@ -41,9 +41,9 @@ namespace Larva.RaftAlgo.Concensus.Cluster
         /// </summary>
         public void Load()
         {
-            if (_clusterSettings.RemoteNodes != null)
+            if (_clusterSettings.Nodes != null)
             {
-                foreach (var nodeId in _clusterSettings.RemoteNodes)
+                foreach (var nodeId in _clusterSettings.Nodes)
                 {
                     AddRemoteNode(nodeId.Id, nodeId.ServiceUri);
                 }
@@ -65,7 +65,7 @@ namespace Larva.RaftAlgo.Concensus.Cluster
         /// <returns></returns>
         public int GetNodeCount()
         {
-            return _nodes.Count + 1;
+            return _nodes.Count;
         }
 
         /// <summary>
@@ -80,6 +80,7 @@ namespace Larva.RaftAlgo.Concensus.Cluster
                 var rpcClient = _rpcClientProvider.GetRpcClient(serviceUri);
                 var remoteNode = new RemoteNode(nodeId, serviceUri, rpcClient);
                 _nodes.Add(remoteNode);
+                Console.WriteLine($"Add remote node: nodeId={nodeId}, serviceUri={serviceUri}");
             }
         }
     }

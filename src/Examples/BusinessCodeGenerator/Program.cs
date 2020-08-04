@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using Larva.RaftAlgo.Concensus.Node;
 using Larva.RaftAlgo;
 using Larva.RaftAlgo.Concensus.Cluster;
+using BusinessCodeGenerator.Configuration;
 
 namespace BusinessCodeGenerator
 {
@@ -52,7 +53,10 @@ Option:
 
             var webHostBuilder = new WebHostBuilder();
             webHostBuilder.UseUrls(apiUrl == nodeUrl ? new string[] { apiUrl } : new string[] { apiUrl, nodeUrl })
-                .UseKestrel()
+                .UseKestrel(opts =>
+                {
+                    opts.AddServerHeader = true;
+                })
                 .UseContentRoot(Directory.GetCurrentDirectory())
                 .ConfigureAppConfiguration((hostingContext, config) =>
                 {
@@ -76,7 +80,13 @@ Option:
                     });
                     x.AddSingleton<IClusterSettings>(new InMemoryClusterSettings
                     {
-                        RemoteNodes = null
+                        Nodes = new NodeId[] {
+                            new NodeId("node1", new Uri("http://localhost:15001")),
+                            new NodeId("node2", new Uri("http://localhost:15002")),
+                            // new NodeId("node3", new Uri("http://localhost:15003")),
+                            // new NodeId("node4", new Uri("http://localhost:15004")),
+                            // new NodeId("node5", new Uri("http://localhost:15005"))
+                        }
                     });
 
                     x.AddRouting();
@@ -84,6 +94,12 @@ Option:
                 })
                 .Configure(app =>
                 {
+                    var codeConfigManager = app.ApplicationServices.GetService<IBusinessCodeConfigManager>();
+                    codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 1, "JH", 4, "进货单");
+                    codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 2, "UP", 4, "上货单");
+                    codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 3, "CH", 4, "出货单");
+                    codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 4, "DN", 4, "下货单");
+
                     app.UseRaftAlgo();
 
                     app.UseRouting();

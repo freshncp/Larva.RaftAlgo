@@ -3,6 +3,7 @@ using System.IO;
 using System.Net;
 using System.Threading.Tasks;
 using BusinessCodeGenerator.Caches;
+using BusinessCodeGenerator.Configuration;
 using Larva.RaftAlgo.Concensus.Node;
 using Larva.RaftAlgo.Concensus.Rpc.Messages;
 using Microsoft.AspNetCore.Http;
@@ -13,16 +14,18 @@ namespace BusinessCodeGenerator.Raft
 {
     public class HttpRpcServer
     {
-        private INode _node;
-        private ILogger _logger;
-        private IBusinessCodeCache _businessCodeCache;
-        private JsonSerializerSettings _jsonSerializerSettings;
+        private readonly INode _node;
+        private readonly ILogger _logger;
+        private readonly IBusinessCodeCache _businessCodeCache;
+        private readonly IBusinessCodeConfigManager _businessCodeConfigManager;
+        private readonly JsonSerializerSettings _jsonSerializerSettings;
 
-        public HttpRpcServer(INode node, IBusinessCodeCache businessCodeCache, ILoggerFactory loggerFactory)
+        public HttpRpcServer(INode node, IBusinessCodeCache businessCodeCache, IBusinessCodeConfigManager businessCodeConfigManager, ILoggerFactory loggerFactory)
         {
             _node = node;
             _logger = loggerFactory.CreateLogger("HttpRpcServer");
             _businessCodeCache = businessCodeCache;
+            _businessCodeConfigManager = businessCodeConfigManager;
             _jsonSerializerSettings = new JsonSerializerSettings()
             {
                 TypeNameHandling = TypeNameHandling.All
@@ -52,18 +55,18 @@ namespace BusinessCodeGenerator.Raft
                 }
 
                 var requestVote =
-                    JsonConvert.DeserializeObject<RequestVoteRequest>(json, _jsonSerializerSettings);
+                    JsonConvert.DeserializeObject<RequestVoteRequest>(json);
                 _logger.LogDebug(
                     $"{context.Request.Path} called, my state is {_node.State.GetType().FullName}");
                 var requestVoteResponse = await _node.RequestVoteAsync(requestVote);
                 await context.Response.WriteAsync(
-                    JsonConvert.SerializeObject(requestVoteResponse, _jsonSerializerSettings));
+                    JsonConvert.SerializeObject(requestVoteResponse));
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                await context.Response.WriteAsync(JsonConvert.SerializeObject(e, _jsonSerializerSettings));
-                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.Id}", e);
+                await context.Response.WriteAsync(JsonConvert.SerializeObject(ex));
+                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.Id}", ex);
             }
         }
 
@@ -78,19 +81,19 @@ namespace BusinessCodeGenerator.Raft
                 }
 
                 var appendEntries =
-                    JsonConvert.DeserializeObject<AppendEntriesRequest>(json, _jsonSerializerSettings);
+                    JsonConvert.DeserializeObject<AppendEntriesRequest>(json);
                 _logger.LogDebug(
                     $"{context.Request.Path} called, my state is {_node.State.GetType().FullName}");
 
                 var appendEntriesResponse = await _node.AppendEntriesAsync(appendEntries);
                 await context.Response.WriteAsync(
-                    JsonConvert.SerializeObject(appendEntriesResponse, _jsonSerializerSettings));
+                    JsonConvert.SerializeObject(appendEntriesResponse));
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                await context.Response.WriteAsync(JsonConvert.SerializeObject(e, _jsonSerializerSettings));
-                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.State}", e);
+                await context.Response.WriteAsync(JsonConvert.SerializeObject(ex));
+                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.State}", ex);
             }
         }
 
@@ -109,12 +112,17 @@ namespace BusinessCodeGenerator.Raft
                     _logger.LogDebug($"{context.Request.Path} called, my state is {_node.State.GetType().FullName}");
                     if (_node.Role == NodeRole.Leader || command.CurrentTime == null)
                     {
+                        var config = _businessCodeConfigManager.Get(command.ApplicationId, command.CodeType);
+                        if (config == null)
+                        {
+                            await context.Response.WriteAsync(JsonConvert.SerializeObject(new ExecuteCommandResponse(null, false, "unable to save business code to state machine")));
+                            return;
+                        }
                         var code = _businessCodeCache.Get(command.ApplicationId, command.CodeType);
                         command = new GenerateBusinessCodeCommand(command.ApplicationId, command.CodeType, DateTime.Now);
                     }
                     var commandResponse = await _node.ExecuteCommandAsync(command);
-                    await context.Response.WriteAsync(
-                        JsonConvert.SerializeObject(commandResponse, _jsonSerializerSettings));
+                    await context.Response.WriteAsync(JsonConvert.SerializeObject(commandResponse));
                 }
                 else
                 {
@@ -122,11 +130,11 @@ namespace BusinessCodeGenerator.Raft
                     await context.Response.WriteAsync("Bad command request.");
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
                 context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-                await context.Response.WriteAsync(JsonConvert.SerializeObject(e, _jsonSerializerSettings));
-                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.Id}", e);
+                await context.Response.WriteAsync(JsonConvert.SerializeObject(ex));
+                _logger.LogError($"THERE WAS A PROBLEM ON NODE {_node.Id}", ex);
             }
         }
     }

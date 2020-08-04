@@ -1,4 +1,5 @@
 using System;
+using Larva.RaftAlgo.Concensus.Node;
 
 namespace Larva.RaftAlgo.Concensus
 {
@@ -12,14 +13,15 @@ namespace Larva.RaftAlgo.Concensus
         private readonly Random _random;
 
         /// <summary>
-        /// 
+        /// Election timeout random
         /// </summary>
         /// <param name="settings"></param>
-        public DefaultElectionTimeoutRandom(IRaftSettings settings)
+        /// <param name="nodeId"></param>
+        public DefaultElectionTimeoutRandom(IRaftSettings settings, NodeId nodeId)
         {
-            _minElectionTimeoutMilliseconds = settings.MinElectionTimeoutMilliseconds < 1000 ? 1000 : settings.MinElectionTimeoutMilliseconds;
-            _maxElectionTimeoutMilliseconds = Math.Max(_minElectionTimeoutMilliseconds + 1000, settings.MaxElectionTimeoutMilliseconds < 2000 ? 2000 : settings.MaxElectionTimeoutMilliseconds);
-            _random = new Random(DateTime.Now.Millisecond);
+            _minElectionTimeoutMilliseconds = Math.Max(1000, settings.MinElectionTimeoutMilliseconds);
+            _maxElectionTimeoutMilliseconds = Math.Max(_minElectionTimeoutMilliseconds + 1000, settings.MaxElectionTimeoutMilliseconds);
+            _random = new Random(nodeId.Id.GetHashCode());
         }
 
         /// <summary>
@@ -28,7 +30,7 @@ namespace Larva.RaftAlgo.Concensus
         /// <returns></returns>
         public TimeSpan GetElectionTimeout()
         {
-            return TimeSpan.FromMilliseconds(_random.Next(_minElectionTimeoutMilliseconds / 100, _maxElectionTimeoutMilliseconds / 100) * 100);
+            return TimeSpan.FromMilliseconds(_random.Next(_minElectionTimeoutMilliseconds / 500, _maxElectionTimeoutMilliseconds / 500) * 500);
         }
     }
 }

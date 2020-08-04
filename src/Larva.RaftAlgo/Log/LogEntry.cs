@@ -10,7 +10,7 @@ namespace Larva.RaftAlgo.Log
         /// </summary>
         /// <param name="command"></param>
         /// <param name="term"></param>
-        public LogEntry(string command, long term)
+        public LogEntry(object command, long term)
         {
             Command = command;
             Term = term;
@@ -19,7 +19,7 @@ namespace Larva.RaftAlgo.Log
         /// <summary>
         /// Command for state machine
         /// </summary>
-        public string Command { get; private set; }
+        public object Command { get; private set; }
 
         /// <summary>
         /// Term when entry was received by leader (first index is 1)

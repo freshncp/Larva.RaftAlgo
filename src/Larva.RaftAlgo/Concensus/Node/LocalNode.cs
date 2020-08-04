@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Larva.RaftAlgo.Concensus.Cluster;
-using Larva.RaftAlgo.Concensus.Rpc;
 using Larva.RaftAlgo.Concensus.Rpc.Messages;
 using Larva.RaftAlgo.Log;
 using Larva.RaftAlgo.StateMachine;
@@ -25,6 +24,7 @@ namespace Larva.RaftAlgo.Concensus.Node
         private readonly int _appendEntriesBatchSize;
         private readonly SemaphoreSlim _nodeLock = new SemaphoreSlim(1, 1);
         private ICluster _cluster;
+        private Timer _electionTimeoutTimer;
         private volatile int _receivedAppendEntriesOrGrantedVote = 0;
         private volatile int _heartbeatSending = 0;
         private volatile string _leaderId;
@@ -121,7 +121,8 @@ namespace Larva.RaftAlgo.Concensus.Node
             if (Role != NodeRole.Follower)
             {
                 Role = NodeRole.Follower;
-                State.ResetVotedFor();
+                State = new NodeState(State.CurrentTerm, null, State.CommitIndex, State.LastApplied);
+
                 StartElection();
             }
         }
@@ -155,13 +156,13 @@ namespace Larva.RaftAlgo.Concensus.Node
         public async Task<RequestVoteResponse> RequestVoteAsync(RequestVoteRequest request)
         {
             await _nodeLock.WaitAsync();
-            var response = new RequestVoteResponse(State.CurrentTerm, false);
+            var response = new RequestVoteResponse(State.CurrentTerm, false, "Unknown error");
             try
             {
                 if (request.Term < State.CurrentTerm)
                 {
                     // 1. Reply false if term < currentTerm (§5.1)
-                    response = new RequestVoteResponse(State.CurrentTerm, false);
+                    response = new RequestVoteResponse(State.CurrentTerm, false, "term < currentTerm");
                 }
                 else
                 {
@@ -170,18 +171,14 @@ namespace Larva.RaftAlgo.Concensus.Node
                     {
                         // If RPC request or response contains term T > currentTerm: set currentTerm = T, convert to follower (§5.1)
                         State.SetTerm(request.Term);
-                        if ((request.LastLogTerm == lastTermAndIndex.term && request.LastLogIndex == lastTermAndIndex.index)
-                            || (request.LastLogTerm >= lastTermAndIndex.term && request.LastLogIndex > lastTermAndIndex.index))
-                        {
-                            BecomeFollower();
-                        }
+                        BecomeFollower();
                     }
 
                     if (Role == NodeRole.Follower
                         && (string.IsNullOrEmpty(State.VotedFor) || State.VotedFor == request.CandidateId))
                     {
                         if ((request.LastLogTerm == lastTermAndIndex.term && request.LastLogIndex == lastTermAndIndex.index)
-                            || (request.LastLogTerm > lastTermAndIndex.term && request.LastLogIndex > lastTermAndIndex.term))
+                            || (request.LastLogTerm >= lastTermAndIndex.term && request.LastLogIndex > lastTermAndIndex.index))
                         {
                             // 2. If votedFor is null or candidateId, and candidate’s log is at
                             // least as up-to-date as receiver’s log, grant vote (§5.2, §5.4)
@@ -191,12 +188,14 @@ namespace Larva.RaftAlgo.Concensus.Node
                         }
                         else
                         {
-                            response = new RequestVoteResponse(State.CurrentTerm, false);
+                            Console.WriteLine($"request.LastLogTerm={request.LastLogTerm}, request.LastLogIndex={request.LastLogIndex}");
+                            Console.WriteLine($"lastTermAndIndex.term={lastTermAndIndex.term}, lastTermAndIndex.index={lastTermAndIndex.index}");
+                            response = new RequestVoteResponse(State.CurrentTerm, false, "candidate’s log is not up-to-date as receiver’s log");
                         }
                     }
                     else
                     {
-                        response = new RequestVoteResponse(State.CurrentTerm, false);
+                        response = new RequestVoteResponse(State.CurrentTerm, false, "Not follower or has grant vote to another candicate");
                     }
                 }
                 return response;
@@ -242,6 +241,11 @@ namespace Larva.RaftAlgo.Concensus.Node
                         State.SetTerm(request.Term);
                         BecomeFollower();
                     }
+                    if (Role == NodeRole.Candidate)
+                    {
+                        // If AppendEntries RPC received from new leader: convert to follower
+                        BecomeFollower();
+                    }
 
                     if (request.Entries != null && request.Entries.Length > 0)
                     {
@@ -261,7 +265,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                         // 5. If leaderCommit > commitIndex, set commitIndex =
                         // min(leaderCommit, index of last new entry)
                         lastTermAndIndex = await _log.GetLastTermAndIndexAsync();
-                        State.SetCommitIndex(Math.Min(request.LeaderCommit, lastTermAndIndex.index));
+                        State.SetCommitIndexAndLastApplied(Math.Min(request.LeaderCommit, lastTermAndIndex.index));
 
                     }
                     Interlocked.Exchange(ref _leaderId, request.LeaderId);
@@ -297,23 +301,50 @@ namespace Larva.RaftAlgo.Concensus.Node
                     if (string.IsNullOrEmpty(_leaderId))
                     {
                         response = new ExecuteCommandResponse(null, false, "No leader found");
+                        _nodeLock.Release();
                     }
-                    var leaderNode = _cluster.Nodes?.FirstOrDefault(f => f.Id == _leaderId);
-                    if (leaderNode == null)
+                    else
                     {
-                        response = new ExecuteCommandResponse(null, false, $"Leader {_leaderId} not found in cluster");
+                        var leaderNode = _cluster.Nodes?.FirstOrDefault(f => f.Id == _leaderId);
+                        if (leaderNode == null)
+                        {
+                            response = new ExecuteCommandResponse(null, false, $"Leader {_leaderId} not found in cluster");
+                            _nodeLock.Release();
+                        }
+                        else
+                        {
+                            _nodeLock.Release();
+                            response = await leaderNode.ExecuteCommandAsync(command);
+                        }
                     }
-                    _nodeLock.Release();
-                    response = await leaderNode.ExecuteCommandAsync(command);
                     break;
                 case NodeRole.Candidate:
                     response = new ExecuteCommandResponse(null, false, $"Candidate couldn't execute command");
                     _nodeLock.Release();
                     break;
                 case NodeRole.Leader:
-                    // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
-                    //TODO: Replicated log to followers.
-                    _nodeLock.Release();
+                    if (_cluster.IsSingleNodeCluster())
+                    {
+                        var newLogEntry = new LogEntry(command, State.CurrentTerm);
+                        await _log.AppendAsync(newLogEntry);
+                        var executeResult = await _stateMachine.HandleAsync(newLogEntry);
+                        response = new ExecuteCommandResponse(executeResult, true, null);
+                        var lastTermAndIndex = await _log.GetLastTermAndIndexAsync();
+                        State.SetCommitIndexAndLastApplied(lastTermAndIndex.index);
+                        _nodeLock.Release();
+                    }
+                    else
+                    {
+                        var newLogEntry = new LogEntry(command, State.CurrentTerm);
+                        await _log.AppendAsync(newLogEntry);
+                        var executeResult = await _stateMachine.HandleAsync(newLogEntry);
+                        response = new ExecuteCommandResponse(executeResult, true, null);
+                        var lastTermAndIndex = await _log.GetLastTermAndIndexAsync();
+                        State.SetCommitIndexAndLastApplied(lastTermAndIndex.index);
+                        _nodeLock.Release();
+                        // If command received from client: append entry to local log, respond after entry applied to state machine (§5.3)
+                        //TODO: Replicated log to followers.
+                    }
                     break;
             }
             return response;
@@ -351,9 +382,15 @@ namespace Larva.RaftAlgo.Concensus.Node
 
         private void StartElection()
         {
-            Task.Delay(_electionTimeoutRandom.GetElectionTimeout()).ContinueWith(async (lastTask, state) =>
+            _electionTimeoutTimer?.Dispose();
+
+            var electionTimeout = _electionTimeoutRandom.GetElectionTimeout();
+            Console.WriteLine($"Election timeout after {electionTimeout.TotalMilliseconds}");
+            _electionTimeoutTimer = new Timer(async (state) =>
             {
                 if (_disposing == 1) return;
+
+                Console.WriteLine($"Election timeout.");
                 await _nodeLock.WaitAsync();
                 if (Role == NodeRole.Follower)
                 {
@@ -381,9 +418,14 @@ namespace Larva.RaftAlgo.Concensus.Node
                 }
                 else
                 {
+                    _electionTimeoutTimer?.Dispose();
                     _nodeLock.Release();
                 }
-            }, this);
+            }, this, electionTimeout, electionTimeout);
+
+            // Task.Delay(electionTimeout).ContinueWith(async (lastTask, state) =>
+            // {
+            // }, this);
         }
 
         private async Task DoElectionAsync()
@@ -434,6 +476,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                     {
                         // If votes received from majority of servers: become leader
                         BecomeLeader();
+                        StartSendingHeartbeat();
                     }
                     else
                     {
@@ -492,8 +535,9 @@ namespace Larva.RaftAlgo.Concensus.Node
                             if (!lastHeartbeatSending)
                             {
                                 // If last log index ≥ nextIndex for a follower: send AppendEntries RPC with log entries starting at nextIndex
-                                entries = await _log.GetListFromAsync(currentState.NextIndex[remoteNode.Id], _appendEntriesBatchSize);
+                                entries = await _log.GetListFromAsync(currentState.MatchIndex[remoteNode.Id] + 1, _appendEntriesBatchSize);
                             }
+
                             sendHeartbeatTasks.Add(Tuple.Create(remoteNode.Id, entries == null ? 0 : entries.Length, remoteNode.AppendEntriesAsync(new AppendEntriesRequest(currentState.CurrentTerm, Id, prevLogIndex, prevLogTerm, entries, lastTermAndIndex.index))));
                         }
 

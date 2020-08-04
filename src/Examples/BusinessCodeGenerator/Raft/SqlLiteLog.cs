@@ -45,9 +45,9 @@ namespace BusinessCodeGenerator.Raft
                         command text null
                     )";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var createCommand = new SqliteCommand(sql, connection))
                     {
-                        var result = command.ExecuteNonQuery();
+                        var result = createCommand.ExecuteNonQuery();
                     }
                 }
             }
@@ -66,9 +66,9 @@ namespace BusinessCodeGenerator.Raft
 
                     const string sql = @"select term, id from logs order by id desc limit 1";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
+                        using (var reader = await selectCommand.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
@@ -98,9 +98,9 @@ namespace BusinessCodeGenerator.Raft
 
                     var sql = $"select term from logs where id = {index}";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        var term = Convert.ToInt64(await command.ExecuteScalarAsync());
+                        var term = Convert.ToInt64(await selectCommand.ExecuteScalarAsync());
                         return term;
                     }
                 }
@@ -122,13 +122,14 @@ namespace BusinessCodeGenerator.Raft
 
                     var sql = $"select term, command from logs where id = {index}";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
+                        using (var reader = await selectCommand.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
                             {
-                                return new LogEntry(reader.GetString(1), reader.GetInt64(0));
+                                var command = JsonConvert.DeserializeObject(reader.GetString(1), _jsonSerializerSettings);
+                                return new LogEntry(command, reader.GetInt64(0));
                             }
                         }
                     }
@@ -152,13 +153,14 @@ namespace BusinessCodeGenerator.Raft
                     await connection.OpenAsync();
                     var sql = $"select term, command from logs where id >= {index}";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
+                        using (var reader = await selectCommand.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                var logEntry = new LogEntry(reader.GetString(1), reader.GetInt64(0));
+                                var command = JsonConvert.DeserializeObject(reader.GetString(1), _jsonSerializerSettings);
+                                var logEntry = new LogEntry(command, reader.GetInt64(0));
                                 logsToReturn.Add(logEntry);
                             }
                         }
@@ -182,9 +184,9 @@ namespace BusinessCodeGenerator.Raft
                     connection.Open();
                     const string sql = @"select count(id) from logs";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        var index = Convert.ToInt64(await command.ExecuteScalarAsync());
+                        var index = Convert.ToInt64(await selectCommand.ExecuteScalarAsync());
                         return index < 0 ? 0L : index;
                     }
                 }
@@ -197,22 +199,24 @@ namespace BusinessCodeGenerator.Raft
 
         public async Task DeleteConflictsFromThisLogAsync(long prevLogIndex, LogEntry[] newLogEntries)
         {
+            if (newLogEntries == null || newLogEntries.Length == 0) return;
+
             _lock.EnterWriteLock();
             try
             {
                 using (var connection = new SqliteConnection($"Data Source={_path};"))
                 {
                     connection.Open();
-                    var logEntries = new List<LogEntry>();
-                    var sql = $"select term, command from logs where id > {prevLogIndex} and id <= {prevLogIndex + newLogEntries.Length};";
+                    var logTerms = new List<long>();
+                    var sql = $"select term from logs where id > {prevLogIndex} order by id limit {newLogEntries.Length};";
                     _logger.LogDebug($"id: {_nodeId} sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var selectCommand = new SqliteCommand(sql, connection))
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
+                        using (var reader = await selectCommand.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                logEntries.Add(new LogEntry(reader.GetString(1), reader.GetInt64(0)));
+                                logTerms.Add(reader.GetInt64(0));
                             }
                         }
                     }
@@ -221,7 +225,7 @@ namespace BusinessCodeGenerator.Raft
                         var newLogIndex = prevLogIndex + i + 1;
                         var newLogTerm = newLogEntries[i].Term;
 
-                        if (logEntries.Count > i && logEntries[i].Term != newLogTerm)
+                        if (logTerms.Count > i && logTerms[i] != newLogTerm)
                         {
                             var deleteSql = $"delete from logs where id >= {newLogIndex};";
                             _logger.LogDebug($"id: {_nodeId}, deleteSql: {deleteSql}");
@@ -246,12 +250,13 @@ namespace BusinessCodeGenerator.Raft
             {
                 using (var connection = new SqliteConnection($"Data Source={_path};"))
                 {
-                    connection.Open();
-                    var sql = $"insert into logs (term, command) values ({newLogEntry.Term}, '{newLogEntry.Command.Replace("'", "''")}')";
+                    await connection.OpenAsync();
+                    var commandData = JsonConvert.SerializeObject(newLogEntry.Command, _jsonSerializerSettings);
+                    var sql = $"insert into logs (term, command) values ({newLogEntry.Term}, '{commandData.Replace("'", "''")}')";
                     _logger.LogDebug($"id: {_nodeId}, sql: {sql}");
-                    using (var command = new SqliteCommand(sql, connection))
+                    using (var insertCommand = new SqliteCommand(sql, connection))
                     {
-                        var result = await command.ExecuteNonQueryAsync();
+                        var result = await insertCommand.ExecuteNonQueryAsync();
                     }
                 }
             }
@@ -279,19 +284,21 @@ namespace BusinessCodeGenerator.Raft
                 using (var connection = new SqliteConnection($"Data Source={_path};"))
                 {
                     connection.Open();
-
+                    var firstCommandData = JsonConvert.SerializeObject(newLogEntries[0].Command, _jsonSerializerSettings);
                     var sqlBuilder = new StringBuilder($@"insert into logs (term, command)
-select {newLogEntries[0].Term} as term, '{newLogEntries[0].Command.Replace("'", "''")}' as command)");
+select {newLogEntries[0].Term} as term, '{firstCommandData.Replace("'", "''")}' as command
+");
                     for (var i = 1; i < newLogEntries.Length; i++)
                     {
                         var newLogEntry = newLogEntries[i];
-                        var newCommand = string.IsNullOrEmpty(newLogEntry.Command) ? "" : newLogEntry.Command.Replace("'", "''");
-                        sqlBuilder.AppendLine($"union select {newLogEntry.Term}, '{newCommand}' ");
+                        var commandData = JsonConvert.SerializeObject(newLogEntries[i].Command, _jsonSerializerSettings);
+                        sqlBuilder.AppendLine($"union select {newLogEntry.Term}, '{commandData.Replace("'", "''")}' ");
                     }
                     _logger.LogDebug($"id: {_nodeId}, sql: {sqlBuilder}");
-                    using (var command = new SqliteCommand(sqlBuilder.ToString(), connection))
+                    Console.WriteLine($"id: {_nodeId}, sql: {sqlBuilder}");
+                    using (var insertCommand = new SqliteCommand(sqlBuilder.ToString(), connection))
                     {
-                        var result = await command.ExecuteNonQueryAsync();
+                        var result = await insertCommand.ExecuteNonQueryAsync();
                     }
                 }
             }

@@ -24,13 +24,12 @@ namespace BusinessCodeGenerator.Raft
         {
             return await Task.Run(() =>
             {
-                var command = Newtonsoft.Json.JsonConvert.DeserializeObject(log.Command);
-                if (command != null && command is GenerateBusinessCodeCommand generateCommand)
+                if (log.Command != null && log.Command is GenerateBusinessCodeCommand generateCommand)
                 {
                     var config = _businessCodeConfigManager.Get(generateCommand.ApplicationId, generateCommand.CodeType);
                     if (config == null)
                     {
-                        throw new ApplicationException($"unable to save business code to state machine");
+                        return string.Empty;
                     }
 
                     var code = _businessCodeCache.Get(generateCommand.ApplicationId, generateCommand.CodeType);

@@ -8,8 +8,8 @@ namespace Larva.RaftAlgo.Concensus.Cluster
     public interface IClusterSettings
     {
         /// <summary>
-        /// Remote nodes
+        /// Nodes
         /// </summary>
-        NodeId[] RemoteNodes { get; }
+        NodeId[] Nodes { get; }
     }
 }

@@ -10,10 +10,12 @@ namespace Larva.RaftAlgo.Concensus.Rpc.Messages
         /// </summary>
         /// <param name="term"></param>
         /// <param name="voteGranted"></param>
-        public RequestVoteResponse(long term, bool voteGranted)
+        /// <param name="reason"></param>
+        public RequestVoteResponse(long term, bool voteGranted, string reason = "")
         {
             Term = term;
             VoteGranted = voteGranted;
+            Reason = reason;
         }
 
         /// <summary>
@@ -25,5 +27,11 @@ namespace Larva.RaftAlgo.Concensus.Rpc.Messages
         /// true means candidate received vote
         /// </summary>
         public bool VoteGranted { get; private set; }
+
+        /// <summary>
+        /// Not grant vote reason
+        /// </summary>
+        /// <value></value>
+        public string Reason { get; private set; }
     }
 }

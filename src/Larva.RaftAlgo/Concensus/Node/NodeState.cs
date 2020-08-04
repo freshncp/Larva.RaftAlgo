@@ -53,14 +53,6 @@ namespace Larva.RaftAlgo.Concensus.Node
         }
 
         /// <summary>
-        /// Reset votedfor to null.
-        /// </summary>
-        public void ResetVotedFor()
-        {
-            VotedFor = null;
-        }
-
-        /// <summary>
         /// Set term to greater one
         /// </summary>
         /// <param name="newTerm"></param>
@@ -88,9 +80,10 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// Set commit index to specific one.
         /// </summary>
         /// <param name="newCommitIndex"></param>
-        public void SetCommitIndex(long newCommitIndex)
+        public void SetCommitIndexAndLastApplied(long newCommitIndex)
         {
             CommitIndex = newCommitIndex;
+            LastApplied = newCommitIndex;
         }
     }
 
