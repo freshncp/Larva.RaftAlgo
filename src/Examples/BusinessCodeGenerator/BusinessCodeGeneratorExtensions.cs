@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Threading.Tasks;
 using BusinessCodeGenerator.Caches;
 using BusinessCodeGenerator.Configuration;
@@ -23,6 +24,7 @@ namespace BusinessCodeGenerator
             var configuration = (ConfigurationRoot)services.BuildServiceProvider()
                 .GetRequiredService<IConfiguration>();
             services.AddSingleton<IElectionTimeoutRandom, DefaultElectionTimeoutRandom>();
+            services.AddSingleton<ICommandSerializer, JsonCommandSerializer>();
             services.AddSingleton<ILog, SqlLiteLog>();
             services.AddSingleton<IRpcClientProvider, HttpRpcClientProvider>();
             services.AddSingleton<INode, LocalNode>();
@@ -34,8 +36,10 @@ namespace BusinessCodeGenerator
             return services;
         }
 
-        public static IApplicationBuilder UseRaftAlgo(this IApplicationBuilder app)
+        public static IApplicationBuilder UseRaftAlgo(this IApplicationBuilder app, Assembly[] assemblies)
         {
+            var commandSerializer = app.ApplicationServices.GetService<ICommandSerializer>();
+            ((JsonCommandSerializer)commandSerializer).Initialize(assemblies);
             var applicationLifetime = app.ApplicationServices.GetService<IHostApplicationLifetime>();
             applicationLifetime.ApplicationStopping.Register(async () => await OnShutdown(app));
             var node = app.ApplicationServices.GetService<INode>() as LocalNode;

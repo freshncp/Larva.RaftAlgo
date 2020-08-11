@@ -12,6 +12,7 @@ using Larva.RaftAlgo.Concensus.Node;
 using Larva.RaftAlgo;
 using Larva.RaftAlgo.Concensus.Cluster;
 using BusinessCodeGenerator.Configuration;
+using System.Reflection;
 
 namespace BusinessCodeGenerator
 {
@@ -100,7 +101,7 @@ Option:
                     codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 3, "CH", 4, "出货单");
                     codeConfigManager.Add(new Guid("902e7bc8-0754-48b0-8396-ebebb802257c"), 4, "DN", 4, "下货单");
 
-                    app.UseRaftAlgo();
+                    app.UseRaftAlgo(new Assembly[] { typeof(Program).Assembly });
 
                     app.UseRouting();
                     app.UseEndpoints(endpoints =>

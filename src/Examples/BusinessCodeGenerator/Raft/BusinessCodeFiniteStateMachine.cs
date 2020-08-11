@@ -9,13 +9,16 @@ namespace BusinessCodeGenerator.Raft
 {
     public class BusinessCodeFiniteStateMachine : IReplicatedStateMachine
     {
+        private readonly ICommandSerializer _commandSerializer;
         private readonly IBusinessCodeConfigManager _businessCodeConfigManager;
         private readonly IBusinessCodeCache _businessCodeCache;
 
         public BusinessCodeFiniteStateMachine(
+            ICommandSerializer commandSerializer,
             IBusinessCodeConfigManager businessCodeConfigManager,
             IBusinessCodeCache businessCodeCache)
         {
+            _commandSerializer = commandSerializer;
             _businessCodeConfigManager = businessCodeConfigManager;
             _businessCodeCache = businessCodeCache;
         }
@@ -24,18 +27,23 @@ namespace BusinessCodeGenerator.Raft
         {
             return await Task.Run(() =>
             {
-                if (log.Command != null && log.Command is GenerateBusinessCodeCommand generateCommand)
+                if (!string.IsNullOrEmpty(log.CommandType) && log.CommandData != null)
                 {
-                    var config = _businessCodeConfigManager.Get(generateCommand.ApplicationId, generateCommand.CodeType);
-                    if (config == null)
+                    var command = _commandSerializer.Deserialize(log.CommandType, log.CommandData);
+                    if (command != null && command is GenerateBusinessCodeCommand generateCommand)
                     {
-                        return string.Empty;
-                    }
+                        var config = _businessCodeConfigManager.Get(generateCommand.ApplicationId, generateCommand.CodeType);
+                        if (config == null)
+                        {
+                            return string.Empty;
+                        }
 
-                    var code = _businessCodeCache.Get(generateCommand.ApplicationId, generateCommand.CodeType);
-                    code.Generate(generateCommand.CurrentTime ?? DateTime.Now);
-                    var generatedCode = $"{config.CodePrefix}{code.Infix}{code.Sequence.ToString().PadLeft(config.SequenceMinLength, '0')}";
-                    return generatedCode;
+                        var code = _businessCodeCache.Get(generateCommand.ApplicationId, generateCommand.CodeType);
+                        code.Generate(generateCommand.CurrentTime ?? DateTime.Now);
+                        var generatedCode = $"{config.CodePrefix}{code.Infix}{code.Sequence.ToString().PadLeft(config.SequenceMinLength, '0')}";
+                        Console.WriteLine($"generatedCode={generatedCode}");
+                        return generatedCode;
+                    }
                 }
                 return string.Empty;
             });

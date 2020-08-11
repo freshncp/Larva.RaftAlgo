@@ -1,3 +1,5 @@
+using System;
+
 namespace Larva.RaftAlgo.Log
 {
     /// <summary>
@@ -8,18 +10,25 @@ namespace Larva.RaftAlgo.Log
         /// <summary>
         /// Log entry
         /// </summary>
-        /// <param name="command"></param>
+        /// <param name="commandType"></param>
+        /// <param name="commandData"></param>
         /// <param name="term"></param>
-        public LogEntry(object command, long term)
+        public LogEntry(string commandType, byte[] commandData, long term)
         {
-            Command = command;
+            CommandType = commandType;
+            CommandData = commandData;
             Term = term;
         }
 
         /// <summary>
-        /// Command for state machine
+        /// Command's type
         /// </summary>
-        public object Command { get; private set; }
+        public string CommandType { get; private set; }
+
+        /// <summary>
+        /// Command's data for state machine
+        /// </summary>
+        public byte[] CommandData { get; private set; }
 
         /// <summary>
         /// Term when entry was received by leader (first index is 1)

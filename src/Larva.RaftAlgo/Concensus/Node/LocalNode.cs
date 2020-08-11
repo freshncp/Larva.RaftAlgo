@@ -19,6 +19,7 @@ namespace Larva.RaftAlgo.Concensus.Node
         private readonly IReplicatedStateMachine _stateMachine;
         private readonly ILog _log;
         private readonly IElectionTimeoutRandom _electionTimeoutRandom;
+        private readonly ICommandSerializer _commandSerializer;
         private readonly int _heartbeatMilliseconds;
         private readonly int _commandTimeoutMilliseconds;
         private readonly int _appendEntriesBatchSize;
@@ -37,12 +38,14 @@ namespace Larva.RaftAlgo.Concensus.Node
         /// <param name="stateMachine"></param>
         /// <param name="log"></param>
         /// <param name="electionTimeoutRandom"></param>
+        /// <param name="commandSerializer"></param>
         /// <param name="settings"></param>
         public LocalNode(
             NodeId nodeId,
             IReplicatedStateMachine stateMachine,
             ILog log,
             IElectionTimeoutRandom electionTimeoutRandom,
+            ICommandSerializer commandSerializer,
             IRaftSettings settings)
         {
             Id = nodeId.Id;
@@ -51,6 +54,7 @@ namespace Larva.RaftAlgo.Concensus.Node
             _stateMachine = stateMachine;
             _log = log;
             _electionTimeoutRandom = electionTimeoutRandom;
+            _commandSerializer = commandSerializer;
             _heartbeatMilliseconds = settings.HeartbeatMilliseconds <= 0 ? 100 : settings.HeartbeatMilliseconds;
             _commandTimeoutMilliseconds = settings.CommandTimeoutMilliseconds <= 0 ? 3000 : settings.CommandTimeoutMilliseconds;
             _appendEntriesBatchSize = settings.AppendEntriesBatchSize <= 0 ? 100 : settings.AppendEntriesBatchSize;
@@ -259,7 +263,12 @@ namespace Larva.RaftAlgo.Concensus.Node
                         var lastIndexAheadCount = Convert.ToInt32(lastTermAndIndex.index - request.PrevLogIndex);
                         if (lastIndexAheadCount >= 0 && lastIndexAheadCount < request.Entries.Length)
                         {
-                            await _log.BatchAppendAsync(request.Entries.Skip(lastIndexAheadCount).ToArray());
+                            var appendingEntries = request.Entries.Skip(lastIndexAheadCount).ToArray();
+                            await _log.BatchAppendAsync(appendingEntries);
+                            foreach (var entry in appendingEntries)
+                            {
+                                await _stateMachine.HandleAsync(entry);
+                            }
                         }
 
                         // 5. If leaderCommit > commitIndex, set commitIndex =
@@ -274,9 +283,8 @@ namespace Larva.RaftAlgo.Concensus.Node
 
                 return response;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Handle AppendEntriesAsync fail: {ex.Message}\n{ex.StackTrace}");
                 throw;
             }
             finally
@@ -325,7 +333,8 @@ namespace Larva.RaftAlgo.Concensus.Node
                 case NodeRole.Leader:
                     if (_cluster.IsSingleNodeCluster())
                     {
-                        var newLogEntry = new LogEntry(command, State.CurrentTerm);
+                        var commandData = _commandSerializer.Serialize(command.GetType(), command);
+                        var newLogEntry = new LogEntry(commandData.typeName, commandData.data, State.CurrentTerm);
                         await _log.AppendAsync(newLogEntry);
                         var executeResult = await _stateMachine.HandleAsync(newLogEntry);
                         response = new ExecuteCommandResponse(executeResult, true, null);
@@ -335,7 +344,8 @@ namespace Larva.RaftAlgo.Concensus.Node
                     }
                     else
                     {
-                        var newLogEntry = new LogEntry(command, State.CurrentTerm);
+                        var commandData = _commandSerializer.Serialize(command.GetType(), command);
+                        var newLogEntry = new LogEntry(commandData.typeName, commandData.data, State.CurrentTerm);
                         await _log.AppendAsync(newLogEntry);
                         var executeResult = await _stateMachine.HandleAsync(newLogEntry);
                         response = new ExecuteCommandResponse(executeResult, true, null);
@@ -385,12 +395,10 @@ namespace Larva.RaftAlgo.Concensus.Node
             _electionTimeoutTimer?.Dispose();
 
             var electionTimeout = _electionTimeoutRandom.GetElectionTimeout();
-            Console.WriteLine($"Election timeout after {electionTimeout.TotalMilliseconds}");
             _electionTimeoutTimer = new Timer(async (state) =>
             {
                 if (_disposing == 1) return;
 
-                Console.WriteLine($"Election timeout.");
                 await _nodeLock.WaitAsync();
                 if (Role == NodeRole.Follower)
                 {
@@ -414,6 +422,7 @@ namespace Larva.RaftAlgo.Concensus.Node
                     State.IncreaseTermAndVoteFor(Id);
                     _nodeLock.Release();
 
+                    Console.WriteLine($"Do Election.");
                     await DoElectionAsync();
                 }
                 else
@@ -422,10 +431,6 @@ namespace Larva.RaftAlgo.Concensus.Node
                     _nodeLock.Release();
                 }
             }, this, electionTimeout, electionTimeout);
-
-            // Task.Delay(electionTimeout).ContinueWith(async (lastTask, state) =>
-            // {
-            // }, this);
         }
 
         private async Task DoElectionAsync()

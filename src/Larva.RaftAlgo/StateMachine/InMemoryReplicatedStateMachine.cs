@@ -15,7 +15,7 @@ namespace Larva.RaftAlgo.StateMachine
         /// <returns></returns>
         public Task<string> HandleAsync(LogEntry log)
         {
-            return Task.FromResult(log.Command.GetType().FullName);
+            return Task.FromResult(log.CommandData.GetType().FullName);
         }
     }
 }

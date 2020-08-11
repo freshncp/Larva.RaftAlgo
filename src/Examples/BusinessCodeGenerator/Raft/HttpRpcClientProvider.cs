@@ -10,7 +10,7 @@ namespace BusinessCodeGenerator.Raft
     {
         private readonly int _commandTimeoutMilliseconds;
         private readonly ILoggerFactory _loggerFactory;
-
+        
         public HttpRpcClientProvider(IRaftSettings settings, ILoggerFactory loggerFactory)
         {
             _commandTimeoutMilliseconds = settings.CommandTimeoutMilliseconds <= 0 ? 1000 : settings.CommandTimeoutMilliseconds;

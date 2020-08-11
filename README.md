@@ -1,6 +1,8 @@
 # Larva.RaftAlgo
 
-Raft consensus algorithm
+Raft consensus algorithm.
+
+Status: Developing...
 
 ## Reference
 
