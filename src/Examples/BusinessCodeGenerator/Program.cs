@@ -66,7 +66,7 @@ Option:
                     var env = hostingContext.HostingEnvironment;
                     config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
                         .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true, reloadOnChange: false);
-                    config.AddJsonFile("peers.json", optional: true, reloadOnChange: false);
+                    config.AddJsonFile("cluster.json", optional: true, reloadOnChange: false);
                     config.AddCommandLine(args);
                 })
 
@@ -78,16 +78,6 @@ Option:
                     {
                         MinElectionTimeoutMilliseconds = 3000,
                         MaxElectionTimeoutMilliseconds = 6000
-                    });
-                    x.AddSingleton<IClusterSettings>(new InMemoryClusterSettings
-                    {
-                        Nodes = new NodeId[] {
-                            new NodeId("node1", new Uri("http://localhost:15001")),
-                            new NodeId("node2", new Uri("http://localhost:15002")),
-                            // new NodeId("node3", new Uri("http://localhost:15003")),
-                            // new NodeId("node4", new Uri("http://localhost:15004")),
-                            // new NodeId("node5", new Uri("http://localhost:15005"))
-                        }
                     });
 
                     x.AddRouting();

@@ -23,6 +23,8 @@ namespace BusinessCodeGenerator
         {
             var configuration = (ConfigurationRoot)services.BuildServiceProvider()
                 .GetRequiredService<IConfiguration>();
+            services.Configure<RaftClusterConfig>(configuration);
+            services.AddSingleton<IClusterSettings, FromConfigRaftClusterSettings>();
             services.AddSingleton<IElectionTimeoutRandom, DefaultElectionTimeoutRandom>();
             services.AddSingleton<ICommandSerializer, JsonCommandSerializer>();
             services.AddSingleton<ILog, SqlLiteLog>();

@@ -41,7 +41,7 @@ namespace Larva.RaftAlgo.Concensus.Cluster
         /// </summary>
         public void Load()
         {
-            if (_clusterSettings.Nodes != null)
+            if (_clusterSettings != null && _clusterSettings.Nodes != null)
             {
                 foreach (var nodeId in _clusterSettings.Nodes)
                 {
