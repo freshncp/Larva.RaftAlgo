@@ -1,16 +1,26 @@
 {
-    "Nodes": [
-        {
-            "Id": "node1",
-            "ServiceUri": "http://localhost:15001"
-        },
-        {
-            "Id": "node2",
-            "ServiceUri": "http://localhost:15002"
-        },
-        {
-            "Id": "node3",
-            "ServiceUri": "http://localhost:15003"
-        }
-    ]
+    "RaftCluster": {
+        "Nodes": [
+            {
+                "Id": "node1",
+                "ServiceUri": "http://localhost:15001"
+            },
+            {
+                "Id": "node2",
+                "ServiceUri": "http://localhost:15002"
+            },
+            {
+                "Id": "node3",
+                "ServiceUri": "http://localhost:15003"
+            },
+            {
+                "Id": "node4",
+                "ServiceUri": "http://localhost:15004"
+            },
+            {
+                "Id": "node5",
+                "ServiceUri": "http://localhost:15005"
+            }
+        ]
+    }
 }
